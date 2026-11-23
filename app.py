@@ -3,26 +3,23 @@
 import math
 import streamlit as st
 
-
-# ==========================================================
-# إعداد التطبيق
-# ==========================================================
+# ============================================================
+# إعداد الصفحة
+# ============================================================
 
 st.set_page_config(
-    page_title="توقعات كرة القدم",
+    page_title="محلل المباريات",
     page_icon="⚽",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-
-# ==========================================================
+# ============================================================
 # التصميم
-# ==========================================================
+# ============================================================
 
 st.markdown("""
 <style>
-
 html, body, [class*="css"] {
     direction: rtl;
     text-align: right;
@@ -30,9 +27,8 @@ html, body, [class*="css"] {
 }
 
 .stApp {
-    background:
-        radial-gradient(circle at top, #211a08 0%, #0b0b0b 38%, #030303 100%);
-    color: white;
+    background-color: #070707;
+    color: #ffffff;
 }
 
 .block-container {
@@ -41,140 +37,67 @@ html, body, [class*="css"] {
     padding-bottom: 4rem;
 }
 
-.title {
+h1, h2, h3 {
     text-align: center;
-    color: #f4c542;
-    font-size: 34px;
-    font-weight: 900;
-    margin-bottom: 5px;
-}
-
-.subtitle {
-    text-align: center;
-    color: #aaa;
-    font-size: 15px;
-    margin-bottom: 25px;
-}
-
-.section-title {
-    color: #f4c542;
-    font-size: 22px;
-    font-weight: 900;
-    margin-top: 25px;
-    margin-bottom: 10px;
-    border-right: 5px solid #f4c542;
-    padding-right: 10px;
-}
-
-div[data-baseweb="input"] > div {
-    background-color: #151515 !important;
-    border: 1px solid #44391a !important;
-    border-radius: 10px !important;
-}
-
-input {
-    color: white !important;
-    text-align: center !important;
-}
-
-label {
-    color: #eeeeee !important;
-    font-weight: 700 !important;
 }
 
 .stButton > button,
 .stFormSubmitButton > button {
     width: 100%;
+    min-height: 55px;
     border-radius: 12px;
-    min-height: 52px;
+    border: 0;
     font-size: 18px;
-    font-weight: 900;
-    background: linear-gradient(135deg, #ffd95a, #b88711);
-    color: #090909;
-    border: none;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ffd95a, #b88a16);
+    color: #080808;
 }
 
-.result-card {
-    background: linear-gradient(145deg, #141414, #090909);
-    border: 1px solid #413617;
-    border-radius: 16px;
-    padding: 18px;
-    margin: 15px 0;
+div[data-testid="stMetric"] {
+    background-color: #111111;
+    border: 1px solid #3d3216;
+    padding: 12px;
+    border-radius: 14px;
 }
 
-.card-title {
-    text-align: center;
-    color: #f4c542;
-    font-size: 21px;
-    font-weight: 900;
-    margin-bottom: 15px;
+div[data-testid="stExpander"] {
+    border: 1px solid #3d3216;
+    border-radius: 14px;
 }
 
-.score {
-    text-align: center;
-    color: white;
-    font-size: 35px;
-    font-weight: 900;
-    padding: 12px 0;
+input {
+    text-align: center !important;
 }
 
-.row {
-    font-size: 17px;
-    padding: 9px;
-    border-bottom: 1px solid #222;
-}
-
-.home {
-    color: #36d98b;
-    font-weight: 900;
-}
-
-.draw {
-    color: #5aa7ff;
-    font-weight: 900;
-}
-
-.away {
-    color: #ff6767;
-    font-weight: 900;
-}
-
-.gold {
-    color: #f4c542;
-    font-weight: 900;
-}
-
-.center {
-    text-align: center;
-}
-
-.note {
-    text-align: center;
-    color: #777;
-    font-size: 12px;
-    margin-top: 30px;
+hr {
+    border-color: #332b17;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 
-# ==========================================================
-# دوال الحساب
-# ==========================================================
+# ============================================================
+# دوال المحرك
+# ============================================================
 
-def poisson(k, lam):
-    return math.exp(-lam) * (lam ** k) / math.factorial(k)
+def poisson(goals, expected):
+    return (
+        math.exp(-expected)
+        * expected ** goals
+        / math.factorial(goals)
+    )
 
 
 def form_score(wins, draws, losses):
 
     games = wins + draws + losses
 
-    if games == 0:
+    if games <= 0:
         return 0.5
 
-    return ((wins * 3) + draws) / (games * 3)
+    points = wins * 3 + draws
+    return points / (games * 3)
 
 
 def normalize(a, b, c):
@@ -182,38 +105,38 @@ def normalize(a, b, c):
     total = a + b + c
 
     if total <= 0:
-        return 1 / 3, 1 / 3, 1 / 3
+        return 1/3, 1/3, 1/3
 
-    return a / total, b / total, c / total
+    return a/total, b/total, c/total
 
 
 def team_strength(team):
 
     games = (
-        team["wins"]
-        + team["draws"]
-        + team["losses"]
+        team["w"]
+        + team["d"]
+        + team["l"]
     )
 
     if games <= 0:
         games = 5
 
-    goals_scored = team["gf"] / games
-    goals_conceded = team["ga"] / games
+    avg_scored = team["gf"] / games
+    avg_conceded = team["ga"] / games
 
     form = form_score(
-        team["wins"],
-        team["draws"],
-        team["losses"]
+        team["w"],
+        team["d"],
+        team["l"]
     )
 
     attack = (
-        goals_scored * 0.70
+        avg_scored * 0.70
         + form * 0.30
     )
 
     defensive_weakness = (
-        goals_conceded * 0.75
+        avg_conceded * 0.75
         + (1 - form) * 0.25
     )
 
@@ -237,7 +160,7 @@ def expected_goals(home, away, h2h, crowd):
         crowd["away"]
     )
 
-    # القوة الهجومية والدفاعية
+    # القوة الأساسية
 
     home_xg = (
         home_attack * 0.58
@@ -249,7 +172,7 @@ def expected_goals(home, away, h2h, crowd):
         + home_weak * 0.42
     )
 
-    # أفضلية الأرض
+    # أفضلية ملعب المضيف
 
     home_xg *= 1.10
 
@@ -257,24 +180,24 @@ def expected_goals(home, away, h2h, crowd):
 
     form_difference = home_form - away_form
 
-    home_xg *= 1 + (form_difference * 0.12)
-    away_xg *= 1 - (form_difference * 0.12)
+    home_xg *= 1 + form_difference * 0.12
+    away_xg *= 1 - form_difference * 0.12
 
     # المواجهات المباشرة
 
     h2h_difference = h_home - h_away
 
-    home_xg *= 1 + (h2h_difference * 0.10)
-    away_xg *= 1 - (h2h_difference * 0.10)
+    home_xg *= 1 + h2h_difference * 0.10
+    away_xg *= 1 - h2h_difference * 0.10
 
-    # الجمهور
+    # تصويت الجمهور
 
     crowd_difference = c_home - c_away
 
-    home_xg *= 1 + (crowd_difference * 0.05)
-    away_xg *= 1 - (crowd_difference * 0.05)
+    home_xg *= 1 + crowd_difference * 0.05
+    away_xg *= 1 - crowd_difference * 0.05
 
-    # حدود منطقية للنموذج
+    # حدود النموذج
 
     home_xg = max(0.20, min(home_xg, 4.00))
     away_xg = max(0.20, min(away_xg, 4.00))
@@ -282,19 +205,28 @@ def expected_goals(home, away, h2h, crowd):
     return home_xg, away_xg
 
 
-def score_matrix(home_xg, away_xg, max_goals=8):
+def build_matrix(home_xg, away_xg, max_goals=8):
 
     matrix = {}
 
     for hg in range(max_goals + 1):
 
-        ph = poisson(hg, home_xg)
+        home_probability = poisson(
+            hg,
+            home_xg
+        )
 
         for ag in range(max_goals + 1):
 
-            pa = poisson(ag, away_xg)
+            away_probability = poisson(
+                ag,
+                away_xg
+            )
 
-            matrix[(hg, ag)] = ph * pa
+            matrix[(hg, ag)] = (
+                home_probability
+                * away_probability
+            )
 
     total = sum(matrix.values())
 
@@ -312,61 +244,68 @@ def calculate_markets(matrix):
         "home": 0,
         "draw": 0,
         "away": 0,
+
         "over15": 0,
         "under15": 0,
+
         "over25": 0,
         "under25": 0,
+
         "over35": 0,
         "under35": 0,
+
         "btts_yes": 0,
         "btts_no": 0,
+
+        "home_score": 0,
+        "away_score": 0
     }
 
-    for (hg, ag), probability in matrix.items():
-
-        # نتيجة المباراة
+    for (hg, ag), p in matrix.items():
 
         if hg > ag:
-            result["home"] += probability
+            result["home"] += p
 
         elif hg == ag:
-            result["draw"] += probability
+            result["draw"] += p
 
         else:
-            result["away"] += probability
+            result["away"] += p
 
-        total_goals = hg + ag
+        goals = hg + ag
 
-        # Over / Under
-
-        if total_goals >= 2:
-            result["over15"] += probability
+        if goals >= 2:
+            result["over15"] += p
         else:
-            result["under15"] += probability
+            result["under15"] += p
 
-        if total_goals >= 3:
-            result["over25"] += probability
+        if goals >= 3:
+            result["over25"] += p
         else:
-            result["under25"] += probability
+            result["under25"] += p
 
-        if total_goals >= 4:
-            result["over35"] += probability
+        if goals >= 4:
+            result["over35"] += p
         else:
-            result["under35"] += probability
-
-        # الفريقان يسجلان
+            result["under35"] += p
 
         if hg > 0 and ag > 0:
-            result["btts_yes"] += probability
+            result["btts_yes"] += p
         else:
-            result["btts_no"] += probability
+            result["btts_no"] += p
+
+        if hg > 0:
+            result["home_score"] += p
+
+        if ag > 0:
+            result["away_score"] += p
 
     return result
 
 
 def confidence(markets):
 
-    values = sorted(
+    probs = sorted(
         [
             markets["home"],
             markets["draw"],
@@ -375,232 +314,237 @@ def confidence(markets):
         reverse=True
     )
 
-    difference = values[0] - values[1]
+    difference = probs[0] - probs[1]
 
     if difference >= 0.25:
-        return "مرتفعة", "🟢"
+        return "مرتفعة 🟢"
 
-    elif difference >= 0.12:
-        return "متوسطة", "🟡"
+    if difference >= 0.12:
+        return "متوسطة 🟡"
 
-    return "منخفضة", "🔴"
+    return "منخفضة 🔴"
 
 
-def percentage(value):
+def percent(value):
     return f"{value * 100:.1f}%"
 
 
-# ==========================================================
-# العنوان
-# ==========================================================
+# ============================================================
+# رأس التطبيق
+# ============================================================
 
-st.markdown("""
-<div class="title">
-    ⚽ توقعات كرة القدم
-</div>
+st.title("⚽ محلل مباريات كرة القدم")
 
-<div class="subtitle">
-    تحليل احتمالي للمباريات
-</div>
-""", unsafe_allow_html=True)
+st.caption(
+    "تحليل إحصائي احتمالي للمباراة"
+)
+
+st.divider()
 
 
-# ==========================================================
-# نموذج البيانات
-# ==========================================================
+# ============================================================
+# نموذج إدخال المباراة
+# ============================================================
 
 with st.form("match_form"):
 
-    # ------------------------------------------------------
-    # الفريق المضيف
-    # ------------------------------------------------------
-
-    st.markdown(
-        '<div class="section-title">🏠 الفريق المضيف</div>',
-        unsafe_allow_html=True
-    )
+    st.subheader("🏠 الفريق المضيف")
 
     home_name = st.text_input(
         "اسم الفريق المضيف",
         placeholder="مثال: الأهلي"
     )
 
-    c1, c2, c3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-    with c1:
-        home_wins = st.number_input(
+    with col1:
+        home_w = st.number_input(
             "فوز",
-            0,
-            5,
-            0
+            min_value=0,
+            max_value=5,
+            value=0,
+            step=1,
+            key="home_w"
         )
 
-    with c2:
-        home_draws = st.number_input(
+    with col2:
+        home_d = st.number_input(
             "تعادل",
-            0,
-            5,
-            0
+            min_value=0,
+            max_value=5,
+            value=0,
+            step=1,
+            key="home_d"
         )
 
-    with c3:
-        home_losses = st.number_input(
+    with col3:
+        home_l = st.number_input(
             "خسارة",
-            0,
-            5,
-            0
+            min_value=0,
+            max_value=5,
+            value=0,
+            step=1,
+            key="home_l"
         )
 
-    c1, c2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-    with c1:
+    with col1:
         home_gf = st.number_input(
-            "الأهداف المسجلة",
-            0,
-            50,
-            0,
-            key="home_gf"
+            "الأهداف المسجلة في آخر 5",
+            min_value=0,
+            max_value=50,
+            value=0,
+            step=1
         )
 
-    with c2:
+    with col2:
         home_ga = st.number_input(
-            "الأهداف المستقبلة",
-            0,
-            50,
-            0,
-            key="home_ga"
+            "الأهداف المستقبلة في آخر 5",
+            min_value=0,
+            max_value=50,
+            value=0,
+            step=1
         )
 
-    # ------------------------------------------------------
-    # الفريق الضيف
-    # ------------------------------------------------------
+    st.divider()
 
-    st.markdown(
-        '<div class="section-title">✈️ الفريق الضيف</div>',
-        unsafe_allow_html=True
-    )
+    # ========================================================
+    # الضيف
+    # ========================================================
+
+    st.subheader("✈️ الفريق الضيف")
 
     away_name = st.text_input(
         "اسم الفريق الضيف",
         placeholder="مثال: الزمالك"
     )
 
-    c1, c2, c3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-    with c1:
-        away_wins = st.number_input(
+    with col1:
+        away_w = st.number_input(
             "فوز الضيف",
-            0,
-            5,
-            0
+            min_value=0,
+            max_value=5,
+            value=0,
+            step=1
         )
 
-    with c2:
-        away_draws = st.number_input(
+    with col2:
+        away_d = st.number_input(
             "تعادل الضيف",
-            0,
-            5,
-            0
+            min_value=0,
+            max_value=5,
+            value=0,
+            step=1
         )
 
-    with c3:
-        away_losses = st.number_input(
+    with col3:
+        away_l = st.number_input(
             "خسارة الضيف",
-            0,
-            5,
-            0
+            min_value=0,
+            max_value=5,
+            value=0,
+            step=1
         )
 
-    c1, c2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-    with c1:
+    with col1:
         away_gf = st.number_input(
-            "الأهداف المسجلة للضيف",
-            0,
-            50,
-            0
+            "الأهداف المسجلة للضيف في آخر 5",
+            min_value=0,
+            max_value=50,
+            value=0,
+            step=1
         )
 
-    with c2:
+    with col2:
         away_ga = st.number_input(
-            "الأهداف المستقبلة للضيف",
-            0,
-            50,
-            0
+            "الأهداف المستقبلة للضيف في آخر 5",
+            min_value=0,
+            max_value=50,
+            value=0,
+            step=1
         )
 
-    # ------------------------------------------------------
-    # H2H
-    # ------------------------------------------------------
+    st.divider()
 
-    st.markdown(
-        '<div class="section-title">⚔️ المواجهات المباشرة</div>',
-        unsafe_allow_html=True
-    )
+    # ========================================================
+    # المواجهات المباشرة
+    # ========================================================
+
+    st.subheader("⚔️ المواجهات المباشرة")
 
     st.caption(
-        "أدخل نسب جميع المواجهات التاريخية بين الفريقين"
+        "أدخل النسب التاريخية للمواجهات بين الفريقين"
     )
 
-    c1, c2, c3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-    with c1:
+    with col1:
         h2h_home = st.number_input(
             "فوز المضيف %",
-            0.0,
-            100.0,
-            33.0
+            min_value=0.0,
+            max_value=100.0,
+            value=33.0,
+            step=1.0
         )
 
-    with c2:
+    with col2:
         h2h_draw = st.number_input(
-            "التعادل %",
-            0.0,
-            100.0,
-            34.0
+            "تعادل %",
+            min_value=0.0,
+            max_value=100.0,
+            value=34.0,
+            step=1.0
         )
 
-    with c3:
+    with col3:
         h2h_away = st.number_input(
             "فوز الضيف %",
-            0.0,
-            100.0,
-            33.0
+            min_value=0.0,
+            max_value=100.0,
+            value=33.0,
+            step=1.0
         )
 
-    # ------------------------------------------------------
+    st.divider()
+
+    # ========================================================
     # الجمهور
-    # ------------------------------------------------------
+    # ========================================================
 
-    st.markdown(
-        '<div class="section-title">👥 تصويت الجمهور</div>',
-        unsafe_allow_html=True
-    )
+    st.subheader("👥 تصويت الجمهور")
 
-    c1, c2, c3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-    with c1:
+    with col1:
         crowd_home = st.number_input(
-            "تصويت المضيف %",
-            0.0,
-            100.0,
-            33.0
+            "المضيف %",
+            min_value=0.0,
+            max_value=100.0,
+            value=33.0,
+            step=1.0
         )
 
-    with c2:
+    with col2:
         crowd_draw = st.number_input(
-            "تصويت التعادل %",
-            0.0,
-            100.0,
-            34.0
+            "التعادل %",
+            min_value=0.0,
+            max_value=100.0,
+            value=34.0,
+            step=1.0
         )
 
-    with c3:
+    with col3:
         crowd_away = st.number_input(
-            "تصويت الضيف %",
-            0.0,
-            100.0,
-            33.0
+            "الضيف %",
+            min_value=0.0,
+            max_value=100.0,
+            value=33.0,
+            step=1.0
         )
 
     st.write("")
@@ -611,78 +555,73 @@ with st.form("match_form"):
     )
 
 
-# ==========================================================
-# إجراء التحليل
-# ==========================================================
+# ============================================================
+# تنفيذ التحليل
+# ============================================================
 
 if submitted:
 
-    error = None
+    errors = []
 
     if not home_name.strip():
-
-        error = "أدخل اسم الفريق المضيف"
-
-    elif not away_name.strip():
-
-        error = "أدخل اسم الفريق الضيف"
-
-    elif (
-        home_wins
-        + home_draws
-        + home_losses
-    ) != 5:
-
-        error = (
-            "مجموع الفوز والتعادل والخسارة "
-            "للفريق المضيف يجب أن يساوي 5"
+        errors.append(
+            "أدخل اسم الفريق المضيف."
         )
 
-    elif (
-        away_wins
-        + away_draws
-        + away_losses
-    ) != 5:
-
-        error = (
-            "مجموع الفوز والتعادل والخسارة "
-            "للفريق الضيف يجب أن يساوي 5"
+    if not away_name.strip():
+        errors.append(
+            "أدخل اسم الفريق الضيف."
         )
 
-    elif (
+    if home_w + home_d + home_l != 5:
+        errors.append(
+            "مجموع فوز وتعادل وخسارة المضيف يجب أن يساوي 5."
+        )
+
+    if away_w + away_d + away_l != 5:
+        errors.append(
+            "مجموع فوز وتعادل وخسارة الضيف يجب أن يساوي 5."
+        )
+
+    if (
         h2h_home
         + h2h_draw
         + h2h_away
     ) <= 0:
 
-        error = "أدخل نسب المواجهات المباشرة"
+        errors.append(
+            "أدخل نسب المواجهات المباشرة."
+        )
 
-    elif (
+    if (
         crowd_home
         + crowd_draw
         + crowd_away
     ) <= 0:
 
-        error = "أدخل نسب تصويت الجمهور"
+        errors.append(
+            "أدخل نسب تصويت الجمهور."
+        )
 
-    if error:
+    if errors:
 
-        st.error(error)
+        for error in errors:
+            st.error(error)
 
     else:
 
         home_data = {
-            "wins": home_wins,
-            "draws": home_draws,
-            "losses": home_losses,
+            "w": home_w,
+            "d": home_d,
+            "l": home_l,
             "gf": home_gf,
             "ga": home_ga
         }
 
         away_data = {
-            "wins": away_wins,
-            "draws": away_draws,
-            "losses": away_losses,
+            "w": away_w,
+            "d": away_d,
+            "l": away_l,
             "gf": away_gf,
             "ga": away_ga
         }
@@ -706,7 +645,7 @@ if submitted:
             crowd
         )
 
-        matrix = score_matrix(
+        matrix = build_matrix(
             home_xg,
             away_xg
         )
@@ -715,343 +654,286 @@ if submitted:
             matrix
         )
 
-        top_scores = sorted(
+        scores = sorted(
             matrix.items(),
-            key=lambda x: x[1],
+            key=lambda item: item[1],
             reverse=True
         )[:5]
 
-        confidence_text, confidence_icon = confidence(
-            markets
-        )
-
-        possibilities = {
+        possible_outcomes = {
             "home": markets["home"],
             "draw": markets["draw"],
             "away": markets["away"]
         }
 
-        best_direction = max(
-            possibilities,
-            key=possibilities.get
+        direction = max(
+            possible_outcomes,
+            key=possible_outcomes.get
         )
 
-        if best_direction == "home":
-            direction = f"فوز {home_name}"
+        if direction == "home":
+            direction_text = f"فوز {home_name}"
 
-        elif best_direction == "away":
-            direction = f"فوز {away_name}"
+        elif direction == "away":
+            direction_text = f"فوز {away_name}"
 
         else:
-            direction = "التعادل"
+            direction_text = "التعادل"
 
-        st.session_state["analysis"] = {
-            "home_name": home_name,
-            "away_name": away_name,
+        st.session_state["analysis_result"] = {
+            "home": home_name,
+            "away": away_name,
             "home_xg": home_xg,
             "away_xg": away_xg,
             "markets": markets,
-            "scores": top_scores,
-            "confidence": confidence_text,
-            "confidence_icon": confidence_icon,
-            "direction": direction
+            "scores": scores,
+            "direction": direction_text,
+            "confidence": confidence(markets)
         }
 
 
-# ==========================================================
-# عرض النتيجة
-# ==========================================================
+# ============================================================
+# النتائج
+# ============================================================
 
-if "analysis" in st.session_state:
+if "analysis_result" in st.session_state:
 
-    data = st.session_state["analysis"]
+    data = st.session_state["analysis_result"]
 
-    home = data["home_name"]
-    away = data["away_name"]
+    home = data["home"]
+    away = data["away"]
 
     markets = data["markets"]
     scores = data["scores"]
 
     best_score = scores[0][0]
 
-    st.markdown("---")
+    st.divider()
 
-    st.markdown(
-        '<div class="title">📊 نتيجة التحليل</div>',
-        unsafe_allow_html=True
+    st.title("📊 نتيجة التحليل")
+
+    # ========================================================
+    # النتيجة الأكثر احتمالاً
+    # ========================================================
+
+    st.subheader("🔥 النتيجة الأكثر احتمالاً")
+
+    st.title(
+        f"{home}  {best_score[0]} - {best_score[1]}  {away}"
     )
 
-    # ------------------------------------------------------
-    # النتيجة المتوقعة
-    # ------------------------------------------------------
-
-    st.markdown(
-        f"""
-        <div class="result-card">
-
-            <div class="card-title">
-                🔥 النتيجة الأكثر احتمالًا
-            </div>
-
-            <div class="score">
-                {home}
-                &nbsp;
-                {best_score[0]} - {best_score[1]}
-                &nbsp;
-                {away}
-            </div>
-
-        </div>
-        """,
-        unsafe_allow_html=True
+    st.caption(
+        "النتيجة السابقة هي أعلى نتيجة منفردة احتمالًا "
+        "في مصفوفة النتائج، وليست نتيجة مضمونة."
     )
 
-    # ------------------------------------------------------
+    # ========================================================
     # Expected Goals
-    # ------------------------------------------------------
+    # ========================================================
 
-    st.markdown(
-        f"""
-        <div class="result-card">
+    st.subheader("⚽ الأهداف المتوقعة")
 
-            <div class="card-title">
-                ⚽ الأهداف المتوقعة
-            </div>
+    col1, col2 = st.columns(2)
 
-            <div class="row home">
-                {home}: {data["home_xg"]:.2f}
-            </div>
-
-            <div class="row away">
-                {away}: {data["away_xg"]:.2f}
-            </div>
-
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # ------------------------------------------------------
-    # 1X2
-    # ------------------------------------------------------
-
-    st.markdown(
-        f"""
-        <div class="result-card">
-
-            <div class="card-title">
-                🏆 احتمالات المباراة
-            </div>
-
-            <div class="row home">
-                فوز {home}:
-                {percentage(markets["home"])}
-            </div>
-
-            <div class="row draw">
-                التعادل:
-                {percentage(markets["draw"])}
-            </div>
-
-            <div class="row away">
-                فوز {away}:
-                {percentage(markets["away"])}
-            </div>
-
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # ------------------------------------------------------
-    # أفضل 5 نتائج
-    # ------------------------------------------------------
-
-    st.markdown(
-        '<div class="section-title">🎯 أفضل 5 نتائج محتملة</div>',
-        unsafe_allow_html=True
-    )
-
-    medals = [
-        "🥇",
-        "🥈",
-        "🥉",
-        "4️⃣",
-        "5️⃣"
-    ]
-
-    for index, ((hg, ag), probability) in enumerate(scores):
-
-        st.markdown(
-            f"""
-            <div class="result-card center">
-
-                <span style="font-size:20px;">
-                    {medals[index]}
-                </span>
-
-                &nbsp;&nbsp;
-
-                <span style="font-size:22px;font-weight:900;">
-                    {hg} - {ag}
-                </span>
-
-                &nbsp;&nbsp;
-
-                <span class="gold">
-                    {percentage(probability)}
-                </span>
-
-            </div>
-            """,
-            unsafe_allow_html=True
+    with col1:
+        st.metric(
+            home,
+            f"{data['home_xg']:.2f}"
         )
 
-    # ------------------------------------------------------
-    # إجمالي الأهداف
-    # ------------------------------------------------------
+    with col2:
+        st.metric(
+            away,
+            f"{data['away_xg']:.2f}"
+        )
 
-    st.markdown(
-        f"""
-        <div class="result-card">
+    # ========================================================
+    # 1X2
+    # ========================================================
 
-            <div class="card-title">
-                ⚽ إجمالي الأهداف
-            </div>
+    st.subheader("🏆 احتمالات المباراة")
 
-            <div class="row">
-                أكثر من 1.5:
-                <span class="gold">
-                    {percentage(markets["over15"])}
-                </span>
-            </div>
+    col1, col2, col3 = st.columns(3)
 
-            <div class="row">
-                أقل من 1.5:
-                <span class="gold">
-                    {percentage(markets["under15"])}
-                </span>
-            </div>
+    with col1:
+        st.metric(
+            f"فوز {home}",
+            percent(markets["home"])
+        )
 
-            <div class="row">
-                أكثر من 2.5:
-                <span class="gold">
-                    {percentage(markets["over25"])}
-                </span>
-            </div>
+    with col2:
+        st.metric(
+            "التعادل",
+            percent(markets["draw"])
+        )
 
-            <div class="row">
-                أقل من 2.5:
-                <span class="gold">
-                    {percentage(markets["under25"])}
-                </span>
-            </div>
+    with col3:
+        st.metric(
+            f"فوز {away}",
+            percent(markets["away"])
+        )
 
-            <div class="row">
-                أكثر من 3.5:
-                <span class="gold">
-                    {percentage(markets["over35"])}
-                </span>
-            </div>
+    # ========================================================
+    # الاتجاه والثقة
+    # ========================================================
 
-            <div class="row">
-                أقل من 3.5:
-                <span class="gold">
-                    {percentage(markets["under35"])}
-                </span>
-            </div>
+    st.subheader("⭐ القراءة النهائية")
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    col1, col2 = st.columns(2)
 
-    # ------------------------------------------------------
+    with col1:
+        st.metric(
+            "اتجاه 1X2",
+            data["direction"]
+        )
+
+    with col2:
+        st.metric(
+            "مؤشر الثقة",
+            data["confidence"]
+        )
+
+    # ========================================================
+    # أفضل 5 نتائج
+    # ========================================================
+
+    st.subheader("🎯 أفضل 5 نتائج محتملة")
+
+    for index, ((hg, ag), probability) in enumerate(
+        scores,
+        start=1
+    ):
+
+        medal = {
+            1: "🥇",
+            2: "🥈",
+            3: "🥉",
+            4: "4️⃣",
+            5: "5️⃣"
+        }[index]
+
+        st.write(
+            f"{medal}  **{home} {hg} - {ag} {away}**"
+            f" — {percent(probability)}"
+        )
+
+    # ========================================================
+    # Over / Under
+    # ========================================================
+
+    st.subheader("⚽ إجمالي أهداف المباراة")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.metric(
+            "أكثر من 1.5",
+            percent(markets["over15"])
+        )
+
+        st.metric(
+            "أكثر من 2.5",
+            percent(markets["over25"])
+        )
+
+        st.metric(
+            "أكثر من 3.5",
+            percent(markets["over35"])
+        )
+
+    with col2:
+
+        st.metric(
+            "أقل من 1.5",
+            percent(markets["under15"])
+        )
+
+        st.metric(
+            "أقل من 2.5",
+            percent(markets["under25"])
+        )
+
+        st.metric(
+            "أقل من 3.5",
+            percent(markets["under35"])
+        )
+
+    # ========================================================
     # BTTS
-    # ------------------------------------------------------
+    # ========================================================
 
-    st.markdown(
-        f"""
-        <div class="result-card">
+    st.subheader("🥅 هل يسجل الفريقان؟")
 
-            <div class="card-title">
-                🥅 هل يسجل الفريقان؟
-            </div>
+    col1, col2 = st.columns(2)
 
-            <div class="row home">
-                نعم:
-                {percentage(markets["btts_yes"])}
-            </div>
+    with col1:
 
-            <div class="row away">
-                لا:
-                {percentage(markets["btts_no"])}
-            </div>
+        st.metric(
+            "نعم",
+            percent(markets["btts_yes"])
+        )
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    with col2:
 
-    # ------------------------------------------------------
-    # التوقع النهائي
-    # ------------------------------------------------------
+        st.metric(
+            "لا",
+            percent(markets["btts_no"])
+        )
 
-    st.markdown(
-        f"""
-        <div class="result-card">
+    # ========================================================
+    # احتمال تسجيل كل فريق
+    # ========================================================
 
-            <div class="card-title">
-                ⭐ التوقع النهائي
-            </div>
+    with st.expander(
+        "📈 تفاصيل هجومية إضافية"
+    ):
 
-            <div class="score">
-                {home}
-                &nbsp;
-                {best_score[0]} - {best_score[1]}
-                &nbsp;
-                {away}
-            </div>
+        col1, col2 = st.columns(2)
 
-            <div class="center" style="font-size:18px;padding:8px;">
-                اتجاه المباراة:
-                <span class="gold">
-                    {data["direction"]}
-                </span>
-            </div>
+        with col1:
 
-            <div class="center" style="font-size:19px;padding:8px;">
-                مؤشر الثقة:
-                {data["confidence_icon"]}
-                <strong>
-                    {data["confidence"]}
-                </strong>
-            </div>
+            st.metric(
+                f"احتمال تسجيل {home}",
+                percent(
+                    markets["home_score"]
+                )
+            )
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+        with col2:
+
+            st.metric(
+                f"احتمال تسجيل {away}",
+                percent(
+                    markets["away_score"]
+                )
+            )
+
+    # ========================================================
+    # مباراة جديدة
+    # ========================================================
+
+    st.write("")
 
     if st.button(
-        "🔄 مباراة جديدة",
+        "🔄 مسح النتيجة",
         use_container_width=True
     ):
 
-        del st.session_state["analysis"]
+        del st.session_state[
+            "analysis_result"
+        ]
 
         st.rerun()
 
 
-# ==========================================================
-# تنبيه
-# ==========================================================
+# ============================================================
+# ملاحظة
+# ============================================================
 
-st.markdown(
-    """
-    <div class="note">
-        ⚠️ التحليل إحصائي واحتمالي ولا يضمن النتيجة الفعلية للمباراة.
-    </div>
-    """,
-    unsafe_allow_html=True
+st.divider()
+
+st.caption(
+    "⚠️ هذا التطبيق يقدم تحليلاً إحصائياً احتماليًا. "
+    "النتائج والتوقعات ليست ضمانًا لنتيجة المباراة الفعلية."
 )
